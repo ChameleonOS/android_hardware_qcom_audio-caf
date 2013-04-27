@@ -62,11 +62,9 @@
 
 #include <linux/ioctl.h>
 #include "msm8960_use_cases.h"
-#if defined(QC_PROP)
     static void (*acdb_send_voice_cal)(int, int);
     static void (*acdb_send_audio_cal)(int, int);
     static void (*acdb_send_anc_cal)(int);
-#endif
 #define PARSE_DEBUG 0
 
 /**
@@ -580,16 +578,16 @@ const char *use_case)
 
     if ((!strncmp(use_case, SND_USE_CASE_VERB_VOICECALL,
         strlen(SND_USE_CASE_VERB_VOICECALL))) ||
-        (!strncmp(use_case, SND_USE_CASE_VERB_SGLTECALL,
-        strlen(SND_USE_CASE_VERB_SGLTECALL))) ||
+        (!strncmp(use_case, SND_USE_CASE_VERB_VOICE2,
+        strlen(SND_USE_CASE_VERB_VOICE2))) ||
         (!strncmp(use_case, SND_USE_CASE_VERB_VOLTE,
         strlen(SND_USE_CASE_VERB_VOLTE))) ||
         (!strncmp(use_case, SND_USE_CASE_VERB_IP_VOICECALL,
         strlen(SND_USE_CASE_VERB_IP_VOICECALL))) ||
         (!strncmp(use_case, SND_USE_CASE_MOD_PLAY_VOICE,
         strlen(SND_USE_CASE_MOD_PLAY_VOICE))) ||
-        (!strncmp(use_case, SND_USE_CASE_MOD_PLAY_SGLTE,
-        strlen(SND_USE_CASE_MOD_PLAY_SGLTE))) ||
+        (!strncmp(use_case, SND_USE_CASE_MOD_PLAY_VOICE2,
+        strlen(SND_USE_CASE_MOD_PLAY_VOICE2))) ||
         (!strncmp(use_case, SND_USE_CASE_MOD_PLAY_VOLTE,
         strlen(SND_USE_CASE_MOD_PLAY_VOLTE))) ||
         (!strncmp(use_case, SND_USE_CASE_MOD_PLAY_VOIP,
@@ -626,6 +624,7 @@ int use_case_index)
     card_mctrl_t *ctrl_list;
     int list_size, index, verb_index, ret = 0, voice_acdb = 0, rx_id, tx_id;
     char *ident_value = NULL;
+    char current_mod[MAX_STR_LEN];
 
     /* Check if voice call use case/modifier exists */
     if ((!strncmp(uc_mgr->card_ctxt_ptr->current_verb,
@@ -633,7 +632,7 @@ int use_case_index)
 	(!strncmp(uc_mgr->card_ctxt_ptr->current_verb,
         SND_USE_CASE_VERB_VOICECALL, strlen(SND_USE_CASE_VERB_VOICECALL))) ||
         (!strncmp(uc_mgr->card_ctxt_ptr->current_verb,
-        SND_USE_CASE_VERB_SGLTECALL, strlen(SND_USE_CASE_VERB_SGLTECALL))) ||
+        SND_USE_CASE_VERB_VOICE2, strlen(SND_USE_CASE_VERB_VOICE2))) ||
         (!strncmp(uc_mgr->card_ctxt_ptr->current_verb,
         SND_USE_CASE_VERB_IP_VOICECALL,
         strlen(SND_USE_CASE_VERB_IP_VOICECALL)))) {
@@ -650,11 +649,12 @@ int use_case_index)
                     strlen(SND_USE_CASE_MOD_PLAY_VOLTE))) ||
 		    (!strncmp(ident_value, SND_USE_CASE_MOD_PLAY_VOICE,
                     strlen(SND_USE_CASE_MOD_PLAY_VOICE))) ||
-                    (!strncmp(ident_value, SND_USE_CASE_MOD_PLAY_SGLTE,
-                    strlen(SND_USE_CASE_MOD_PLAY_SGLTE))) ||
+                    (!strncmp(ident_value, SND_USE_CASE_MOD_PLAY_VOICE2,
+                    strlen(SND_USE_CASE_MOD_PLAY_VOICE2))) ||
                     (!strncmp(ident_value, SND_USE_CASE_MOD_PLAY_VOIP,
                     strlen(SND_USE_CASE_MOD_PLAY_VOIP)))) {
                     voice_acdb = 1;
+                    strlcpy(current_mod, ident_value, MAX_STR_LEN);
                     free(ident_value);
                     ident_value = NULL;
                     break;
@@ -723,18 +723,25 @@ int use_case_index)
                     (tx_id != uc_mgr->current_tx_device)) {
                     uc_mgr->current_rx_device = rx_id;
                     uc_mgr->current_tx_device = tx_id;
-                    ALOGD("Voice acdb: rx id %d tx id %d",
+                    ALOGD("Voice acdb: rx id %d tx id %d verb:%s modifier:%s",
                           uc_mgr->current_rx_device,
-                          uc_mgr->current_tx_device);
-                    if (uc_mgr->acdb_handle) {
-                        acdb_send_voice_cal = dlsym(uc_mgr->acdb_handle,"acdb_loader_send_voice_cal");
-                        if (acdb_send_voice_cal == NULL) {
-                            ALOGE("ucm: dlsym: Error:%s Loading acdb_loader_send_voice_cal", dlerror());
-                        } else if (!uc_mgr->isFusion3Platform) {
-                            acdb_send_voice_cal(uc_mgr->current_rx_device,
-                                uc_mgr->current_tx_device);
+                          uc_mgr->current_tx_device,
+                          uc_mgr->card_ctxt_ptr->current_verb, current_mod);
+                    if ((!strncmp(uc_mgr->card_ctxt_ptr->current_verb,
+                          SND_USE_CASE_VERB_IP_VOICECALL,
+                          strlen(SND_USE_CASE_VERB_IP_VOICECALL)) ||
+                          (!strncmp(current_mod, SND_USE_CASE_MOD_PLAY_VOIP,
+                           strlen(SND_USE_CASE_MOD_PLAY_VOIP)))) ||
+                          (!uc_mgr->isFusion3Platform))
+                        if (uc_mgr->acdb_handle) {
+                            acdb_send_voice_cal = dlsym(uc_mgr->acdb_handle,"acdb_loader_send_voice_cal");
+                            if (acdb_send_voice_cal == NULL) {
+                                ALOGE("Voice acdb: dlsym: Error:%s Loading acdb_loader_send_voice_cal", dlerror());
+                            } else {
+                                acdb_send_voice_cal(uc_mgr->current_rx_device,
+                                        uc_mgr->current_tx_device);
+                            }
                         }
-                    }
                 } else {
                     ALOGV("Voice acdb: Required acdb already pushed \
                          rx id %d tx id %d", uc_mgr->current_rx_device,
@@ -860,7 +867,7 @@ const char *use_case, int enable, int ctrl_list_type, int uc_index)
                     if (uc_mgr->acdb_handle) {
                         acdb_send_audio_cal = dlsym(uc_mgr->acdb_handle,"acdb_loader_send_audio_cal");
                         if (acdb_send_audio_cal == NULL) {
-                            ALOGE("ucm:dlsym:Error:%s Loading acdb_loader_send_audio_cal", dlerror());
+                            ALOGE("dlsym: Error:%s Loading acdb_loader_send_audio_cal", dlerror());
                         } else {
                             acdb_send_audio_cal(ctrl_list[uc_index].acdb_id,
                                     ctrl_list[uc_index].capability);
@@ -999,8 +1006,8 @@ int getUseCaseType(const char *useCase)
         return CAP_TX;
     } else if (!strncmp(useCase, SND_USE_CASE_VERB_VOICECALL,
             MAX_LEN(useCase,SND_USE_CASE_VERB_VOICECALL)) ||
-        !strncmp(useCase, SND_USE_CASE_VERB_SGLTECALL,
-            MAX_LEN(useCase,SND_USE_CASE_VERB_SGLTECALL)) ||
+        !strncmp(useCase, SND_USE_CASE_VERB_VOICE2,
+            MAX_LEN(useCase,SND_USE_CASE_VERB_VOICE2)) ||
         !strncmp(useCase, SND_USE_CASE_VERB_IP_VOICECALL,
             MAX_LEN(useCase,SND_USE_CASE_VERB_IP_VOICECALL)) ||
         !strncmp(useCase, SND_USE_CASE_VERB_DL_REC,
@@ -1015,8 +1022,8 @@ int getUseCaseType(const char *useCase)
             MAX_LEN(useCase,SND_USE_CASE_VERB_INCALL_REC)) ||
         !strncmp(useCase, SND_USE_CASE_MOD_PLAY_VOICE,
             MAX_LEN(useCase,SND_USE_CASE_MOD_PLAY_VOICE)) ||
-        !strncmp(useCase, SND_USE_CASE_MOD_PLAY_SGLTE,
-            MAX_LEN(useCase,SND_USE_CASE_MOD_PLAY_SGLTE)) ||
+        !strncmp(useCase, SND_USE_CASE_MOD_PLAY_VOICE2,
+            MAX_LEN(useCase,SND_USE_CASE_MOD_PLAY_VOICE2)) ||
         !strncmp(useCase, SND_USE_CASE_MOD_PLAY_VOIP,
             MAX_LEN(useCase,SND_USE_CASE_MOD_PLAY_VOIP)) ||
         !strncmp(useCase, SND_USE_CASE_MOD_CAPTURE_VOICE_DL,

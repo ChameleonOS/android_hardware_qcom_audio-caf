@@ -10,8 +10,7 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_ARM_MODE := arm
-LOCAL_CFLAGS := $(common_flags)
-LOCAL_CFLAGS += -D_POSIX_SOURCE
+LOCAL_CFLAGS := -D_POSIX_SOURCE
 LOCAL_CFLAGS += -DQCOM_ACDB_ENABLED
 LOCAL_CFLAGS += -DQCOM_ANC_HEADSET_ENABLED
 LOCAL_CFLAGS += -DQCOM_AUDIO_FORMAT_ENABLED
@@ -31,10 +30,7 @@ ifneq ($(ALSA_DEFAULT_SAMPLE_RATE),)
     LOCAL_CFLAGS += -DALSA_DEFAULT_SAMPLE_RATE=$(ALSA_DEFAULT_SAMPLE_RATE)
 endif
 
-ifeq ($(strip $(BOARD_HAVE_LOW_LATENCY_AUDIO)),true)
-  LOCAL_CFLAGS += -DQCOM_LOW_LATENCY_AUDIO_ENABLED
-endif
-
+#Do not use Dual MIC scenario in call feature
 #Dual MIC solution(Fluence) feature in Built-in MIC used scenarioes.
 # 1. Handset
 # 2. 3-Pole Headphones
@@ -42,6 +38,7 @@ ifeq ($(strip $(BOARD_USES_FLUENCE_INCALL)),true)
 LOCAL_CFLAGS += -DUSES_FLUENCE_INCALL
 endif
 
+#Do not use separate audio Input path feature
 #Separate audio input path can be set using input source of audio parameter
 # 1. Voice Recognition
 # 2. Camcording
@@ -54,8 +51,8 @@ ifeq ($(BOARD_AUDIO_EXPECTS_MIN_BUFFERSIZE),true)
     LOCAL_CFLAGS += -DSET_MIN_PERIOD_BYTES
 endif
 
-ifeq ($(ALSA_PCM_DEBUG),true)
-    LOCAL_CFLAGS += -DSET_PCM_DEBUG_FLAG
+ifeq ($(BOARD_AUDIO_CAF_LEGACY_INPUT_BUFFERSIZE),true)
+    LOCAL_CFLAGS += -DCAF_LEGACY_INPUT_BUFFER_SIZE
 endif
 
 ifeq ($(BOARD_HAVE_AUDIENCE_A2220),true)
@@ -89,7 +86,10 @@ LOCAL_SHARED_LIBRARIES := \
     libhardware \
     libc        \
     libpower    \
-    libalsa-intf
+    libalsa-intf \
+    libaudioutils
+
+#    libsurround_proc
 
 ifeq ($(TARGET_SIMULATOR),true)
  LOCAL_LDLIBS += -ldl
@@ -104,6 +104,7 @@ LOCAL_C_INCLUDES += hardware/libhardware/include
 LOCAL_C_INCLUDES += hardware/libhardware_legacy/include
 LOCAL_C_INCLUDES += frameworks/base/include
 LOCAL_C_INCLUDES += system/core/include
+LOCAL_C_INCLUDES += system/media/audio_utils/include
 
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
@@ -114,6 +115,10 @@ endif
 
 ifeq ($(call is-board-platform,msm8960),true)
   LOCAL_MODULE := audio.primary.msm8960
+endif
+
+ifeq ($(call is-board-platform,msm8610),true)
+  LOCAL_MODULE := audio.primary.msm8610
 endif
 
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
@@ -144,6 +149,10 @@ endif
 
 ifeq ($(call is-board-platform,msm8960),true)
   LOCAL_MODULE := audio_policy.msm8960
+endif
+
+ifeq ($(call is-board-platform,msm8610),true)
+  LOCAL_MODULE := audio_policy.msm8610
 endif
 
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw

@@ -36,10 +36,8 @@
 
 extern "C" {
     #include <sound/asound.h>
-#ifdef QCOM_COMPRESSED_AUDIO_ENABLED
     #include <sound/compress_params.h>
     #include <sound/compress_offload.h>
-#endif
     #include "alsa_audio.h"
     #include "msm8960_use_cases.h"
 }
@@ -63,17 +61,17 @@ class AudioHardwareALSA;
 #define DEFAULT_CHANNEL_MODE  2
 #define VOICE_SAMPLING_RATE   8000
 #define VOICE_CHANNEL_MODE    1
+#define PLAYBACK_LATENCY      96000
 #define RECORD_LATENCY        96000
 #define VOICE_LATENCY         85333
-#ifdef QCOM_LOW_LATENCY_AUDIO_ENABLED
-#define PLAYBACK_LATENCY      170000
-#define DEFAULT_BUFFER_SIZE   4096
-#else
-#define PLAYBACK_LATENCY      96000
 #define DEFAULT_BUFFER_SIZE   2048
-#endif
+#ifdef TARGET_8974
+#define DEFAULT_MULTI_CHANNEL_BUF_SIZE    6144
+#else
 //4032 = 336(kernel buffer size) * 2(bytes pcm_16) * 6(number of channels)
 #define DEFAULT_MULTI_CHANNEL_BUF_SIZE    4032
+#endif
+
 #define DEFAULT_VOICE_BUFFER_SIZE   2048
 #define PLAYBACK_LOW_LATENCY_BUFFER_SIZE   1024
 #define PLAYBACK_LOW_LATENCY  22000
@@ -81,14 +79,12 @@ class AudioHardwareALSA;
 #ifdef TARGET_8974
 #define DEFAULT_IN_BUFFER_SIZE 512
 #define MIN_CAPTURE_BUFFER_SIZE_PER_CH   512
-#define VOIP_BUFFER_SIZE_8K    512
-#define VOIP_BUFFER_SIZE_16K   1024
 #else
 #define DEFAULT_IN_BUFFER_SIZE 320
 #define MIN_CAPTURE_BUFFER_SIZE_PER_CH   320
+#endif
 #define VOIP_BUFFER_SIZE_8K    320
 #define VOIP_BUFFER_SIZE_16K   640
-#endif
 #define MAX_CAPTURE_BUFFER_SIZE_PER_CH   2048
 #define FM_BUFFER_SIZE        1024
 
@@ -168,9 +164,51 @@ static int USBRECBIT_FM = (1 << 3);
 #define NUM_FDS 2
 #define AFE_PROXY_SAMPLE_RATE 48000
 #define AFE_PROXY_CHANNEL_COUNT 2
+#define AFE_PROXY_PERIOD_SIZE 3072
 
 #define MAX_SLEEP_RETRY 100  /*  Will check 100 times before continuing */
 #define AUDIO_INIT_SLEEP_WAIT 50 /* 50 ms */
+
+/* Front left channel. */
+#define PCM_CHANNEL_FL    1
+/* Front right channel. */
+#define PCM_CHANNEL_FR    2
+/* Front center channel. */
+#define PCM_CHANNEL_FC    3
+/* Left surround channel.*/
+#define PCM_CHANNEL_LS   4
+/* Right surround channel.*/
+#define PCM_CHANNEL_RS   5
+/* Low frequency effect channel. */
+#define PCM_CHANNEL_LFE  6
+/* Center surround channel; Rear center channel. */
+#define PCM_CHANNEL_CS   7
+/* Left back channel; Rear left channel. */
+#define PCM_CHANNEL_LB   8
+/* Right back channel; Rear right channel. */
+#define PCM_CHANNEL_RB   9
+/* Top surround channel. */
+#define PCM_CHANNEL_TS   10
+/* Center vertical height channel.*/
+#define PCM_CHANNEL_CVH  11
+/* Mono surround channel.*/
+#define PCM_CHANNEL_MS   12
+/* Front left of center. */
+#define PCM_CHANNEL_FLC  13
+/* Front right of center. */
+#define PCM_CHANNEL_FRC  14
+/* Rear left of center. */
+#define PCM_CHANNEL_RLC  15
+/* Rear right of center. */
+#define PCM_CHANNEL_RRC  16
+
+#define SOUND_CARD_SLEEP_RETRY 5  /*  Will check 5 times before continuing */
+#define SOUND_CARD_SLEEP_WAIT 100 /* 100 ms */
+
+#define VOICE_SESSION_VSID   0x01
+#define VOLTE_SESSION_VSID   0x02
+#define VOICE2_SESSION_VSID  0x03
+#define ALL_SESSION_VSID     0x04
 
 static uint32_t FLUENCE_MODE_ENDFIRE   = 0;
 static uint32_t FLUENCE_MODE_BROADSIDE = 1;
@@ -243,10 +281,10 @@ public:
     virtual ~ALSADevice();
 //    status_t init(alsa_device_t *module, ALSAHandleList &list);
     status_t open(alsa_handle_t *handle);
-    status_t close(alsa_handle_t *handle);
+    status_t close(alsa_handle_t *handle, uint32_t vsid = 0);
     status_t standby(alsa_handle_t *handle);
     status_t route(alsa_handle_t *handle, uint32_t devices, int mode);
-    status_t startVoiceCall(alsa_handle_t *handle);
+    status_t startVoiceCall(alsa_handle_t *handle, uint32_t vsid = 0);
     status_t startVoipCall(alsa_handle_t *handle);
     status_t startFm(alsa_handle_t *handle);
     void     setVoiceVolume(int volume);
@@ -257,21 +295,23 @@ public:
     status_t setFmVolume(int vol);
     void     setBtscoRate(int rate);
     status_t setLpaVolume(int vol);
-    void     enableWideVoice(bool flag);
-    void     enableFENS(bool flag);
+    void     enableWideVoice(bool flag, uint32_t vsid = 0);
+    void     enableFENS(bool flag, uint32_t vsid = 0);
     void     setFlags(uint32_t flag);
     status_t setCompressedVolume(int vol);
-    void     enableSlowTalk(bool flag);
+    status_t setChannelMap(alsa_handle_t *handle, int maxChannels);
+    void     enableSlowTalk(bool flag, uint32_t vsid = 0);
     void     setVocRecMode(uint8_t mode);
     void     setVoLTEMicMute(int state);
     void     setVoLTEVolume(int vol);
-    void     setSGLTEMicMute(int state);
-    void     setSGLTEVolume(int vol);
+    void     setVoice2MicMute(int state);
+    void     setVoice2Volume(int vol);
     status_t setEcrxDevice(char *device);
     void     setInChannels(int);
     //TODO:check if this needs to be public
     void     disableDevice(alsa_handle_t *handle);
     char    *getUCMDeviceFromAcdbId(int acdb_id);
+    status_t getEDIDData(char *hdmiEDIDData);
 #ifdef SEPERATED_AUDIO_INPUT
     void     setInput(int);
 #endif
@@ -289,11 +329,12 @@ private:
     void     switchDevice(alsa_handle_t *handle, uint32_t devices, uint32_t mode);
     int      getUseCaseType(const char *useCase);
     status_t setHDMIChannelCount();
+    void     setChannelAlloc(int channelAlloc);
     status_t setHardwareParams(alsa_handle_t *handle);
     int      deviceName(alsa_handle_t *handle, unsigned flags, char **value);
     status_t setSoftwareParams(alsa_handle_t *handle);
-    bool     platform_is_Fusion3();
     status_t getMixerControl(const char *name, unsigned int &value, int index = 0);
+    status_t getMixerControlExt(const char *name, unsigned **getValues, unsigned *count);
     status_t setMixerControl(const char *name, unsigned int value, int index = -1);
     status_t setMixerControl(const char *name, const char *);
     status_t setMixerControlExt(const char *name, int count, char **setValues);
@@ -316,6 +357,7 @@ private:
     char mMicType[25];
     char mCurRxUCMDevice[50];
     char mCurTxUCMDevice[50];
+    //fluence mode value: FLUENCE_MODE_BROADSIDE or FLUENCE_MODE_ENDFIRE
     uint32_t mFluenceMode;
     int mFmVolume;
     uint32_t mDevSettingsFlag;
@@ -693,11 +735,6 @@ private:
     unsigned int        mFramesLost;
     AudioSystem::audio_in_acoustics mAcoustics;
 
-#ifdef QCOM_CSDCLIENT_ENABLED
-    int start_csd_record(int param);
-    int stop_csd_record();
-#endif
-
 #ifdef QCOM_SSR_ENABLED
     // Function to read coefficients from files.
     status_t            readCoeffsFromFile();
@@ -848,11 +885,13 @@ protected:
 #endif
     void                setInChannels(int device);
 
-    void                disableVoiceCall(char* verb, char* modifier, int mode, int device);
-    void                enableVoiceCall(char* verb, char* modifier, int mode, int device);
-    bool                routeVoiceCall(int device, int	newMode);
+    void                disableVoiceCall(char* verb, char* modifier, int mode, int device,
+                                         uint32_t vsid = 0);
+    void                enableVoiceCall(char* verb, char* modifier, int mode, int device,
+                                        uint32_t vsid = 0);
+    bool                routeVoiceCall(int device, int newMode);
     bool                routeVoLTECall(int device, int newMode);
-    bool                routeSGLTECall(int device, int newMode);
+    bool                routeVoice2Call(int device, int newMode);
     friend class AudioSessionOutALSA;
     friend class AudioStreamOutALSA;
     friend class AudioStreamInALSA;
@@ -883,7 +922,7 @@ protected:
     bool                mMicMute;
     int mCSCallActive;
     int mVolteCallActive;
-    int mSGLTECallActive;
+    int mVoice2CallActive;
     int mCallState;
     int mIsFmActive;
     bool mBluetoothVGS;
@@ -895,6 +934,9 @@ protected:
 
     void *mAcdbHandle;
     void *mCsdHandle;
+
+    //fluence key value: fluencepro, fluence, or none
+    char mFluenceKey[20];
     //A2DP variables
     audio_stream_out   *mA2dpStream;
     audio_hw_device_t  *mA2dpDevice;
@@ -902,6 +944,8 @@ protected:
     audio_stream_out   *mUsbStream;
     audio_hw_device_t  *mUsbDevice;
     audio_stream_out   *mExtOutStream;
+    struct resampler_itfe *mResampler;
+
 
     volatile bool       mKillExtOutThread;
     volatile bool       mExtOutThreadAlive;
@@ -919,12 +963,7 @@ protected:
       USECASE_FM = 0x10,
     };
     uint32_t mExtOutActiveUseCases;
-
-    enum {
-      A2DP_STREAM = 0x1,
-      USB_STREAM  = 0x10,
-    };
-    uint32_t mActiveExtOut;
+    status_t mStatus;
 
 public:
     bool mRouteAudioToExtOut;

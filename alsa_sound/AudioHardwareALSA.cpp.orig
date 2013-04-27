@@ -326,9 +326,6 @@ AudioHardwareALSA::AudioHardwareALSA() :
     } else {
         ALOGI("ucm instance opened: %u", (unsigned)mUcMgr);
         mUcMgr->isFusion3Platform = mFusion3Platform;
-        if (mAcdbHandle) {
-            mUcMgr->acdb_handle = static_cast<void*> (mAcdbHandle);
-        }
     }
 
     //set default AudioParameters
@@ -525,12 +522,12 @@ status_t AudioHardwareALSA::setParameters(const String8& keyValuePairs)
     if (param.get(key, value) == NO_ERROR) {
        if (value == "ONLINE") {
            ALOGV("ADSP online set SSRcomplete");
-           mALSADevice->mADSPState = ADSP_UP_AFTER_SSR;
+           mALSADevice->mSSRComplete = true;
            return status;
        }
        else if (value == "OFFLINE") {
            ALOGV("ADSP online re-set SSRcomplete");
-           mALSADevice->mADSPState = ADSP_DOWN;
+           mALSADevice->mSSRComplete = false;
            if ( mRouteAudioToExtOut==true) {
                ALOGV("ADSP offline close EXT output");
                uint32_t activeUsecase = getExtOutActiveUseCases_l();
@@ -1811,17 +1808,11 @@ AudioHardwareALSA::openInputStream(uint32_t devices,
         if(sampleRate) {
             it->sampleRate = *sampleRate;
         }
-#ifdef CAF_LEGACY_INPUT_BUFFER_SIZE
-	if (6 == it->channels) {
-#endif
         if (!strncmp(it->useCase, SND_USE_CASE_VERB_HIFI_REC, strlen(SND_USE_CASE_VERB_HIFI_REC))
             || !strncmp(it->useCase, SND_USE_CASE_MOD_CAPTURE_MUSIC, strlen(SND_USE_CASE_MOD_CAPTURE_MUSIC))) {
             ALOGV("OpenInoutStream: getInputBufferSize sampleRate:%d format:%d, channels:%d", it->sampleRate,*format,it->channels);
             it->bufferSize = getInputBufferSize(it->sampleRate,*format,it->channels);
         }
-#ifdef CAF_LEGACY_INPUT_BUFFER_SIZE
-	}
-#endif
 
 #ifdef QCOM_SSR_ENABLED
         if (6 == it->channels) {
