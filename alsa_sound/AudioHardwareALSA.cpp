@@ -26,8 +26,7 @@
 #include <math.h>
 
 #define LOG_TAG "AudioHardwareALSA"
-#define LOG_NDEBUG 0
-#define LOG_NDDEBUG 0
+//#define LOG_NDEBUG 0
 #include <utils/Log.h>
 #include <utils/String8.h>
 #include <sys/prctl.h>
@@ -68,10 +67,15 @@ extern "C"
 #ifdef QCOM_CSDCLIENT_ENABLED
     static int (*csd_client_init)();
     static int (*csd_client_deinit)();
+#ifdef NEW_CSDCLIENT
     static int (*csd_start_playback)(uint32_t);
     static int (*csd_stop_playback)(uint32_t);
     static int (*csd_standby_voice)(uint32_t);
     static int (*csd_resume_voice)(uint32_t);
+#else
+    static int (*csd_start_playback)();
+    static int (*csd_stop_playback)();
+#endif
 #endif
 }         // extern "C"
 
@@ -97,7 +101,7 @@ AudioHardwareALSA::AudioHardwareALSA() :
 {
     FILE *fp;
     char soundCardInfo[200];
-    char platform[128], baseband[128], audio_init[128], platformVer[128];
+    char platform[128], baseband[128], baseband_arch[128], audio_init[128], platformVer[128];
     int codec_rev = 2, verNum = 0;
 
     mDeviceList.clear();
@@ -260,8 +264,10 @@ AudioHardwareALSA::AudioHardwareALSA() :
     } else {
         property_get("ro.board.platform", platform, "");
         property_get("ro.baseband", baseband, "");
+        property_get("ro.baseband.arch", baseband_arch, "");
         if (!strcmp("msm8960", platform) &&
-            (!strcmp("mdm", baseband) || !strcmp("sglte2", baseband))) {
+            (!strcmp("mdm", baseband) || !strcmp("sglte2", baseband) ||
+            !strcmp("mdm", baseband_arch))) {
             ALOGV("Detected Fusion tabla 2.x");
             mFusion3Platform = true;
             if((fp = fopen("/sys/devices/system/soc/soc0/platform_version","r")) == NULL) {
@@ -299,6 +305,7 @@ AudioHardwareALSA::AudioHardwareALSA() :
             csd_client_init = (int (*)())::dlsym(mCsdHandle, "csd_client_init");
             csd_client_deinit = (int (*)())::dlsym(mCsdHandle,
                                                    "csd_client_deinit");
+#ifdef NEW_CSDCLIENT
             csd_start_playback = (int (*)(uint32_t))::dlsym(mCsdHandle,
                                                    "csd_client_start_playback");
             csd_stop_playback = (int (*)(uint32_t))::dlsym(mCsdHandle,
@@ -307,6 +314,12 @@ AudioHardwareALSA::AudioHardwareALSA() :
                                                     "csd_client_standby_voice");
             csd_resume_voice = (int (*)(uint32_t))::dlsym(mCsdHandle,
                                                      "csd_client_resume_voice");
+#else
+            csd_start_playback = (int (*)())::dlsym(mCsdHandle,
+                                               "csd_client_start_playback");
+            csd_stop_playback = (int (*)())::dlsym(mCsdHandle,
+                                               "csd_client_stop_playback");
+#endif
 
             if (csd_client_init == NULL) {
                 ALOGE("csd_client_init is NULL");
@@ -597,14 +610,22 @@ status_t AudioHardwareALSA::setParameters(const String8& keyValuePairs)
                 if (csd_start_playback == NULL) {
                     ALOGE("csd_client_start_playback is NULL");
                     } else {
+#ifdef NEW_CSDCLIENT
                         csd_start_playback(ALL_SESSION_VSID);
+#else
+                        csd_start_playback();
+#endif
                     }
             } else {
                 ALOGV("Disabling Incall Music setting in the setparameter\n");
                 if (csd_stop_playback == NULL) {
                     ALOGE("csd_client_stop_playback is NULL");
                 } else {
+#ifdef NEW_CSDCLIENT
                     csd_stop_playback(ALL_SESSION_VSID);
+#else
+                    csd_stop_playback();
+#endif
                 }
             }
             param.remove(key);
@@ -2153,7 +2174,7 @@ bool AudioHardwareALSA::routeVoiceCall(int device, int newMode)
                     alsa_handle_t *handle = (alsa_handle_t *)(&(*vt_it));
                     mCSCallActive = CS_ACTIVE;
 
-#ifdef QCOM_CSDCLIENT_ENABLED
+#if defined(QCOM_CSDCLIENT_ENABLED) && defined(NEW_CSDCLIENT)
                     if (mFusion3Platform) {
                         if (csd_resume_voice == NULL)
                             ALOGE("csd_client_resume_voice is NULL");
@@ -2187,7 +2208,7 @@ bool AudioHardwareALSA::routeVoiceCall(int device, int newMode)
                          strlen(SND_USE_CASE_MOD_PLAY_VOICE)))) {
                          mCSCallActive = CS_HOLD;
                          alsa_handle_t *handle = (alsa_handle_t *)(&(*vt_it));
-#ifdef QCOM_CSDCLIENT_ENABLED
+#if defined(QCOM_CSDCLIENT_ENABLED) && defined(NEW_CSDCLIENT)
                          if (mFusion3Platform) {
                              if (csd_standby_voice == NULL)
                                  ALOGE("csd_standby_voice is NULL");
@@ -2251,7 +2272,7 @@ bool AudioHardwareALSA::routeVoice2Call(int device, int newMode)
                      strlen(SND_USE_CASE_MOD_PLAY_VOICE2)))) {
                      alsa_handle_t *handle = (alsa_handle_t *)(&(*vt_it));
                      mVoice2CallActive = CS_ACTIVE_SESSION2;
-#ifdef QCOM_CSDCLIENT_ENABLED
+#if defined(QCOM_CSDCLIENT_ENABLED) && defined(NEW_CSDCLIENT)
                      if (mFusion3Platform) {
                          if (csd_resume_voice == NULL)
                              ALOGE("csd_client_resume_voice is NULL");
@@ -2286,7 +2307,7 @@ bool AudioHardwareALSA::routeVoice2Call(int device, int newMode)
                          strlen(SND_USE_CASE_MOD_PLAY_VOICE2)))) {
                          mCSCallActive = CS_HOLD_SESSION2;
                          alsa_handle_t *handle = (alsa_handle_t *)(&(*vt_it));
-#ifdef QCOM_CSDCLIENT_ENABLED
+#if defined(QCOM_CSDCLIENT_ENABLED) && defined(NEW_CSDCLIENT)
                          if (mFusion3Platform) {
                              if (csd_standby_voice == NULL)
                                  ALOGE("csd_standby_voice is NULL");
@@ -2350,7 +2371,7 @@ bool AudioHardwareALSA::routeVoLTECall(int device, int newMode)
                      strlen(SND_USE_CASE_MOD_PLAY_VOLTE)))) {
                      alsa_handle_t *handle = (alsa_handle_t *)(&(*vt_it));
                      mVolteCallActive = IMS_ACTIVE;
-#ifdef QCOM_CSDCLIENT_ENABLED
+#if defined(QCOM_CSDCLIENT_ENABLED) && defined(NEW_CSDCLIENT)
                      if (mFusion3Platform) {
                          if (csd_resume_voice == NULL)
                              ALOGE("csd_client_resume_voice is NULL");
@@ -2383,7 +2404,7 @@ bool AudioHardwareALSA::routeVoLTECall(int device, int newMode)
                          strlen(SND_USE_CASE_MOD_PLAY_VOLTE)))) {
                           mVolteCallActive = IMS_HOLD;
                          alsa_handle_t *handle = (alsa_handle_t *)(&(*vt_it));
-#ifdef QCOM_CSDCLIENT_ENABLED
+#if defined(QCOM_CSDCLIENT_ENABLED) && defined(NEW_CSDCLIENT)
                          if (mFusion3Platform) {
                              if (csd_standby_voice == NULL)
                                  ALOGE("csd_standby_voice is NULL");

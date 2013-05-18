@@ -449,6 +449,15 @@ void AudioPolicyManager::setPhoneState(int state)
         setOutputDevice(output, newDevice, (newDevice != AUDIO_DEVICE_NONE));
     }
 
+    //update device for all non-primary outputs
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        audio_io_handle_t output = mOutputs.keyAt(i);
+        if (output != mPrimaryOutput) {
+            newDevice = getNewDevice(output, false /*fromCache*/);
+            setOutputDevice(output, newDevice, (newDevice != AUDIO_DEVICE_NONE));
+        }
+    }
+
     // if entering in call state, handle special case of active streams
     // pertaining to sonification strategy see handleIncallSonification()
     if (isStateInCall(state)) {
@@ -1919,10 +1928,11 @@ bool AudioPolicyManager::isCompatibleProfile(AudioPolicyManagerBase::IOProfile *
 
 bool AudioPolicyManager::platform_is_Fusion3()
 {
-    char platform[128], baseband[128];
+    char platform[128], baseband[128], baseband_arch[128];
     property_get("ro.board.platform", platform, "");
     property_get("ro.baseband", baseband, "");
-    if (!strcmp("msm8960", platform) && !strcmp("mdm", baseband))
+    property_get("ro.baseband.arch", baseband_arch, "");
+    if (!strcmp("msm8960", platform) && (!strcmp("mdm", baseband) || !strcmp("mdm", baseband_arch)))
         return true;
     else
         return false;
