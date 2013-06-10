@@ -533,6 +533,15 @@ void AudioPolicyManager::setPhoneState(int state)
         }
     }
 
+    //update device for all non-primary outputs
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        audio_io_handle_t output = mOutputs.keyAt(i);
+        if (output != mPrimaryOutput) {
+            newDevice = getNewDevice(output, false /*fromCache*/);
+            setOutputDevice(output, newDevice, (newDevice != AUDIO_DEVICE_NONE));
+        }
+    }
+
     // if entering in call state, handle special case of active streams
     // pertaining to sonification strategy see handleIncallSonification()
     if (isStateInCall(state)) {

@@ -198,6 +198,7 @@ static int adjustFlagsForCsd(int flags, const char *rxDevice)
            is the only adaptive mode CSD Client cares about */
         adjustedFlags &= ~(ANC_FLAG);
     }
+
     ALOGD("%s: current Rx device: %s, flags: %x, adjustedFlags: %x",
             __FUNCTION__, rxDevice, flags, adjustedFlags);
     return adjustedFlags;
@@ -603,6 +604,9 @@ void ALSADevice::switchDevice(alsa_handle_t *handle, uint32_t devices, uint32_t 
         if (csd_disable_device == NULL) {
             ALOGE("csd_client_disable_device is NULL");
         } else {
+#ifdef USE_ES325_2MIC
+            setMixerControl("ES325 2Mic Enable", 0, 0);
+#endif
             err = csd_disable_device();
             if (err < 0)
             {
@@ -747,7 +751,8 @@ void ALSADevice::switchDevice(alsa_handle_t *handle, uint32_t devices, uint32_t 
         strlcat(ident, mCurRxUCMDevice, sizeof(ident));
         rx_dev_id = snd_use_case_get(handle->ucMgr, ident, NULL);
 
-        if (rx_dev_id == DEVICE_SPEAKER_RX_ACDB_ID && tx_dev_id == DEVICE_HANDSET_TX_ACDB_ID) {
+        if (((rx_dev_id == DEVICE_SPEAKER_MONO_RX_ACDB_ID ) || (rx_dev_id == DEVICE_SPEAKER_STEREO_RX_ACDB_ID ))
+         && tx_dev_id == DEVICE_HANDSET_TX_ACDB_ID) {
             tx_dev_id = DEVICE_SPEAKER_TX_ACDB_ID;
         }
 
@@ -757,9 +762,31 @@ void ALSADevice::switchDevice(alsa_handle_t *handle, uint32_t devices, uint32_t 
             if (csd_enable_device == NULL) {
                 ALOGE("csd_client_enable_device is NULL");
             } else {
+                int tmp_tx_id = tx_dev_id;
+                int tmp_rx_id = rx_dev_id;
+
+#ifdef USE_ES325_2MIC
+                if (tx_dev_id == 4) {
+                    tmp_tx_id = 34;
+                    setMixerControl("VEQ Enable", 1, 0);
+                    setMixerControl("ES325 2Mic Enable", 1, 0);
+                } else {
+                    setMixerControl("ES325 2Mic Enable", 0, 0);
+                }
+#endif
+#ifdef HTC_CSDCLIENT
+                if (tx_dev_id == DEVICE_BT_SCO_TX_ACDB_ID)
+                {
+                    tmp_tx_id = 1027;
+                }
+                if (rx_dev_id == DEVICE_BT_SCO_RX_ACDB_ID)
+                {
+                    tmp_rx_id = 1127;
+                }
+#endif
                 int adjustedFlags = adjustFlagsForCsd(mDevSettingsFlag,
                         mCurRxUCMDevice);
-                err = csd_enable_device(rx_dev_id, tx_dev_id, adjustedFlags);
+                err = csd_enable_device(tmp_rx_id, tmp_tx_id, adjustedFlags);
                 if (err < 0)
                 {
                     ALOGE("csd_client_disable_device failed, error %d", err);
@@ -1558,7 +1585,8 @@ char *ALSADevice::getUCMDeviceFromAcdbId(int acdb_id)
      switch(acdb_id) {
         case DEVICE_HANDSET_RX_ACDB_ID:
              return strdup(SND_USE_CASE_DEV_HANDSET);
-        case DEVICE_SPEAKER_RX_ACDB_ID:
+        case DEVICE_SPEAKER_MONO_RX_ACDB_ID:
+        case DEVICE_SPEAKER_STEREO_RX_ACDB_ID:
              return strdup(SND_USE_CASE_DEV_SPEAKER);
         case DEVICE_HEADSET_RX_ACDB_ID:
              return strdup(SND_USE_CASE_DEV_HEADPHONES);
@@ -2857,8 +2885,20 @@ void  ALSADevice::setCsdHandle(void* handle)
     csd_slow_talk = (int (*)(uint32_t, uint8_t))::dlsym(mcsd_handle,
                                                         "csd_client_slow_talk");
 #else
-    csd_start_voice = (int (*)())::dlsym(mcsd_handle,"csd_client_start_voice");
-    csd_stop_voice = (int (*)())::dlsym(mcsd_handle,"csd_client_stop_voice");
+    csd_start_voice = (int (*)())::dlsym(mcsd_handle,
+#ifdef SAMSUNG_CSDCLIENT
+            "csd_client_start_voice_og"
+#else
+            "csd_client_start_voice"
+#endif
+            );
+    csd_stop_voice = (int (*)())::dlsym(mcsd_handle,
+#ifdef SAMSUNG_CSDCLIENT
+            "csd_client_stop_voice_og"
+#else
+            "csd_client_stop_voice"
+#endif
+            );
     csd_volume = (int (*)(int))::dlsym(mcsd_handle,"csd_client_volume");
     csd_mic_mute = (int (*)(int))::dlsym(mcsd_handle,"csd_client_mic_mute");
     csd_wide_voice = (int (*)(uint8_t))::dlsym(mcsd_handle,"csd_client_wide_voice");
