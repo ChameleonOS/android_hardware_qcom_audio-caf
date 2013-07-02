@@ -785,12 +785,6 @@ status_t AudioHardwareALSA::setParameters(const String8& keyValuePairs)
     key = String8(MODE_CALL_KEY);
     if (param.getInt(key,state) == NO_ERROR) {
         if (mCallState != state) {
-            if(!((!(mCallState & 0xF) && ((state & 0xF) ==  CS_ACTIVE)) ||
-                 (!(mCallState & 0xF0) && ((state & 0xF0) == IMS_ACTIVE)) ||
-                 (!(mCallState & 0xF00) && ((state & 0xF00) == CS_ACTIVE_SESSION2)))) {
-                mCallState = state;
-                doRouting(0);
-            }
             mCallState = state;
             if (isAnyCallActive()) {
                 doRouting(0);
@@ -1235,12 +1229,6 @@ AudioHardwareALSA::openOutputStream(uint32_t devices,
                    (!strcmp(it->useCase, SND_USE_CASE_MOD_PLAY_VOIP))) {
                     ALOGD("openOutput:  it->rxHandle %d it->handle %d",it->rxHandle,it->handle);
                     voipstream_active = true;
-                    if(mVoipStreamCount >= 2)
-                    {
-                      ALOGE("Avoid creating multiple VoIP session ");
-                      if (status) *status = err;
-                      return NULL;
-                    }
                     break;
                 }
         }
