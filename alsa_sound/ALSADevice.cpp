@@ -890,19 +890,6 @@ void ALSADevice::switchDevice(alsa_handle_t *handle, uint32_t devices, uint32_t 
     amplifier_set_devices(devices);
 #endif
 
-#ifdef USE_A2220
-    ALOGI("a2220: txDevice=%s rxDevice=%s", txDevice, rxDevice);
-    if (rxDevice != NULL && txDevice != NULL &&
-            (!strcmp(txDevice, SND_USE_CASE_DEV_DUAL_MIC_ENDFIRE) ||
-            !strcmp(txDevice, SND_USE_CASE_DEV_DUAL_MIC_BROADSIDE)) &&
-            (!strcmp(rxDevice, SND_USE_CASE_DEV_VOC_EARPIECE) ||
-             !strcmp(rxDevice, SND_USE_CASE_DEV_VOC_EARPIECE_XGAIN))) {
-        setA2220Mode(A2220_PATH_INCALL_RECEIVER_NSON);
-    } else {
-        setA2220Mode(A2220_PATH_INCALL_RECEIVER_NSOFF);
-    }
-#endif
-
     if (rxDevice != NULL) {
         free(rxDevice);
         rxDevice = NULL;
