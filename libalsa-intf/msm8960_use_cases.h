@@ -121,6 +121,7 @@ typedef struct card_mctrl {
     int acdb_id;
     int capability;
     char *effects_mixer_ctl;
+    char *volume_mixer_ctl;
     char *ec_ref_rx_mixer_ctl;
 }card_mctrl_t;
 
@@ -262,14 +263,14 @@ static card_mapping_t card_mapping_list[] = {
 #define SND_USE_CASE_DEV_TTY_HANDSET_ANALOG_TX  "TTY Handset Analog Tx"
 #define SND_USE_CASE_DEV_DUAL_MIC_BROADSIDE "DMIC Broadside"
 #define SND_USE_CASE_DEV_DUAL_MIC_ENDFIRE "DMIC Endfire"
-#define SND_USE_CASE_DEV_DUAL_MIC_ENDFIRE_SGLTE "DMIC Endfire SGLTE"
+#define SND_USE_CASE_DEV_DUAL_MIC_ENDFIRE_SGLTE "DMIC Endfire Voice2"
 #define SND_USE_CASE_DEV_DUAL_MIC_HANDSET_STEREO "Handset DMIC Stereo"
-#define SND_USE_CASE_DEV_DUAL_MIC_HANDSET_STEREO_SGLTE "Handset DMIC Stereo SGLTE"
+#define SND_USE_CASE_DEV_DUAL_MIC_HANDSET_STEREO_SGLTE "Handset DMIC Stereo Voice2"
 #define SND_USE_CASE_DEV_SPEAKER_DUAL_MIC_BROADSIDE "Speaker DMIC Broadside"
 #define SND_USE_CASE_DEV_SPEAKER_DUAL_MIC_ENDFIRE "Speaker DMIC Endfire"
-#define SND_USE_CASE_DEV_SPEAKER_DUAL_MIC_ENDFIRE_SGLTE "Speaker DMIC Endfire SGLTE"
+#define SND_USE_CASE_DEV_SPEAKER_DUAL_MIC_ENDFIRE_SGLTE "Speaker DMIC Endfire Voice2"
 #define SND_USE_CASE_DEV_SPEAKER_DUAL_MIC_STEREO "Speaker DMIC Stereo"
-#define SND_USE_CASE_DEV_SPEAKER_DUAL_MIC_STEREO_SGLTE "Speaker DMIC Stereo SGLTE"
+#define SND_USE_CASE_DEV_SPEAKER_DUAL_MIC_STEREO_SGLTE "Speaker DMIC Stereo Voice2"
 #define SND_USE_CASE_DEV_HDMI_TX             "HDMI Tx"
 #define SND_USE_CASE_DEV_HDMI_SPDIF          "HDMI SPDIF"
 #define SND_USE_CASE_DEV_HDMI_SPDIF_SPEAKER   "HDMI SPDIF Speaker"
@@ -296,6 +297,7 @@ static card_mapping_t card_mapping_list[] = {
 #define SND_USE_CASE_DEV_PROXY_RX_SPEAKER_ANC_HEADSET "PROXY Rx Speaker ANC Headset"
 #define SND_USE_CASE_DEV_CAMCORDER_TX       "Camcorder Tx"
 #define SND_USE_CASE_DEV_VOICE_RECOGNITION  "Voice Recognition"
+#define SND_USE_CASE_DEV_VOICE_RECOGNITION_HEADSET  "Voice Recognition Headset"
 #define SND_USE_CASE_DEV_VOC_EARPIECE       "Voice Earpiece"
 #define SND_USE_CASE_DEV_VOC_EARPIECE_XGAIN "Voice Earpiece Extra Gain"
 #define SND_USE_CASE_DEV_VOC_HEADPHONE      "Voice Headphones"
@@ -305,6 +307,12 @@ static card_mapping_t card_mapping_list[] = {
 #define SND_USE_CASE_DEV_VOC_LINE           "Voice Line"
 #define SND_USE_CASE_DEV_AANC_LINE          "AANC Line"
 #define SND_USE_CASE_DEV_AANC_DMIC_ENDFIRE  "AANC DMIC Endfire"
+#define SND_USE_CASE_DEV_VOIP_EARPIECE      "VOIP Earpiece"
+#define SND_USE_CASE_DEV_VOIP_HEADPHONE     "VOIP Headphones"
+#define SND_USE_CASE_DEV_VOIP_HEADSET       "VOIP Headset"
+#define SND_USE_CASE_DEV_VOIP_SPEAKER       "VOIP Speaker"
+#define SND_USE_CASE_DEV_VOIP_LINE          "VOIP Line"
+#define SND_USE_CASE_DEV_VOIP_HANDSET       "VOIP Handset"
 
 #define SND_USE_CASE_MOD_PLAY_FM         "Play FM"
 #define SND_USE_CASE_MOD_CAPTURE_FM      "Capture FM"
@@ -361,6 +369,7 @@ static int snd_ucm_extract_effects_mixer_ctl(char *buf, char **mixer_name);
 static int snd_ucm_extract_ec_ref_rx_mixer_ctl(char *buf, char **mixer_name);
 static int snd_ucm_extract_dev_name(char *buf, char **dev_name);
 static int snd_ucm_extract_controls(char *buf, mixer_control_t **mixer_list, int count);
+static int snd_ucm_extract_volume_mixer_ctl(char *buf, char **mixer_name);
 static int snd_ucm_print(snd_use_case_mgr_t *uc_mgr);
 static void snd_ucm_free_mixer_list(snd_use_case_mgr_t **uc_mgr);
 #ifdef __cplusplus
