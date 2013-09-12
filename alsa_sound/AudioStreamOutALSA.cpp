@@ -51,9 +51,9 @@ static const int DEFAULT_SAMPLE_RATE = ALSA_DEFAULT_SAMPLE_RATE;
 
 AudioStreamOutALSA::AudioStreamOutALSA(AudioHardwareALSA *parent, alsa_handle_t *handle) :
     ALSAStreamOps(parent, handle),
-    mParent(parent),
     mFrameCount(0),
-    mUseCase(AudioHardwareALSA::USECASE_NONE)
+    mUseCase(AudioHardwareALSA::USECASE_NONE),
+    mParent(parent)
 {
 }
 
@@ -265,7 +265,7 @@ ssize_t AudioStreamOutALSA::write(const void *buffer, size_t bytes)
         if (n < 0) {
             mParent->mLock.lock();
             if (mHandle->handle != NULL) {
-                ALOGE("pcm_write returned error %d, trying to recover\n", n);
+                ALOGE("pcm_write returned error %ld, trying to recover\n", n);
                 pcm_close(mHandle->handle);
                 mHandle->handle = NULL;
                 if((!strncmp(mHandle->useCase, SND_USE_CASE_VERB_IP_VOICECALL, strlen(SND_USE_CASE_VERB_IP_VOICECALL))) ||
@@ -412,7 +412,23 @@ status_t AudioStreamOutALSA::standby()
 uint32_t AudioStreamOutALSA::latency() const
 {
     // Android wants latency in milliseconds.
-    return USEC_TO_MSEC (mHandle->latency);
+    uint32_t latency = mHandle->latency;
+    if ( ((mParent->mCurRxDevice & AudioSystem::DEVICE_OUT_ALL_A2DP) &&
+         (mParent->mExtOutStream == mParent->mA2dpStream))
+         && (mParent->mA2dpStream != NULL) ) {
+        uint32_t bt_latency = mParent->mA2dpStream->get_latency(mParent->mA2dpStream);
+        uint32_t proxy_latency = mParent->mALSADevice->mAvailInMs;
+        latency += bt_latency*1000 + proxy_latency*1000;
+        ALOGV("latency = %d, bt_latency = %d, proxy_latency = %d", latency, bt_latency, proxy_latency);
+    }
+    else if ( ((mParent->mCurRxDevice & AudioSystem::DEVICE_OUT_ALL_USB) &&
+         (mParent->mExtOutStream == mParent->mUsbStream))
+         && (mParent->mUsbStream != NULL) ) {
+        uint32_t usb_latency = mParent->mUsbStream->get_latency(mParent->mUsbStream);
+        latency += usb_latency*1000;
+    }
+
+    return USEC_TO_MSEC (latency);
 }
 
 // return the number of audio frames written by the audio dsp to DAC since

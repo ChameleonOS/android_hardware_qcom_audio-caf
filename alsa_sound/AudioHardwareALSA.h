@@ -352,6 +352,7 @@ public:
     int mADSPState;
     bool mSSRComplete;
     int mCurDevice;
+    long mAvailInMs;
 protected:
     friend class AudioHardwareALSA;
 private:

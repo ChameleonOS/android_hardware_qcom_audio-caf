@@ -98,7 +98,7 @@ AudioHardwareInterface *AudioHardwareALSA::create() {
 
 AudioHardwareALSA::AudioHardwareALSA() :
     mALSADevice(0),mVoipInStreamCount(0),mVoipOutStreamCount(0),mVoipMicMute(false),
-    mVoipBitRate(0),mCallState(0),mAcdbHandle(NULL),mCsdHandle(NULL),mMicMute(0)
+    mVoipBitRate(0),mMicMute(0),mCallState(0),mAcdbHandle(NULL),mCsdHandle(NULL)
 {
     FILE *fp;
     char soundCardInfo[200];
@@ -157,7 +157,7 @@ AudioHardwareALSA::AudioHardwareALSA() :
         ALOGD("AudioHardware: DLOPEN successful for ACDBLOADER");
         acdb_init = (int (*)())::dlsym(mAcdbHandle,"acdb_loader_init_ACDB");
         if (acdb_init == NULL) {
-            ALOGE("dlsym:Error:%s Loading acdb_loader_init_ACDB");
+            ALOGE("dlsym:Error Loading acdb_loader_init_ACDB");
         }else {
            acdb_init();
            acdb_deallocate = (void (*)())::dlsym(mAcdbHandle,"acdb_loader_deallocate_ACDB");
@@ -879,12 +879,6 @@ String8 AudioHardwareALSA::getParameters(const String8& keys)
         param.add(key, value);
     }
 
-    key = String8("tunneled-input-formats");
-    if ( param.get(key,value) == NO_ERROR ) {
-        ALOGD("Add tunnel AWB to audio parameter");
-        param.addInt(String8("AWB"), true );
-    }
-
     key = String8(AudioParameter::keyRouting);
     if (param.getInt(key, device) == NO_ERROR) {
         param.addInt(key, mCurDevice);
@@ -1234,7 +1228,7 @@ AudioHardwareALSA::openOutputStream(uint32_t devices,
             it != mDeviceList.end(); ++it) {
                 if((!strcmp(it->useCase, SND_USE_CASE_VERB_IP_VOICECALL)) ||
                    (!strcmp(it->useCase, SND_USE_CASE_MOD_PLAY_VOIP))) {
-                    ALOGD("openOutput:  it->rxHandle %d it->handle %d",it->rxHandle,it->handle);
+                    ALOGD("openOutput:  it->rxHandle %p it->handle %p",it->rxHandle,it->handle);
                     voipstream_active = true;
                     break;
                 }
@@ -1753,6 +1747,20 @@ AudioHardwareALSA::openInputStream(uint32_t devices,
                                     sizeof(alsa_handle.useCase));
                         }
                     }
+                } else if (*channels & AUDIO_CHANNEL_IN_VOICE_UPLINK) {
+                    if (mFusion3Platform) {
+                        mALSADevice->setVocRecMode(INCALL_REC_MONO);
+                        strlcpy(alsa_handle.useCase, SND_USE_CASE_MOD_CAPTURE_VOICE,
+                                sizeof(alsa_handle.useCase));
+                    } else {
+                        if (*format == AUDIO_FORMAT_AMR_WB) {
+                            strlcpy(alsa_handle.useCase, SND_USE_CASE_MOD_CAPTURE_MUSIC_COMPRESSED,
+                                    sizeof(alsa_handle.useCase));
+                        } else {
+                            strlcpy(alsa_handle.useCase, SND_USE_CASE_MOD_CAPTURE_MUSIC,
+                                    sizeof(alsa_handle.useCase));
+                        }
+                    }
                 }
 #if defined(QCOM_FM_ENABLED) || defined(STE_FM)
             } else if((devices == AudioSystem::DEVICE_IN_FM_RX)) {
@@ -1862,6 +1870,15 @@ AudioHardwareALSA::openInputStream(uint32_t devices,
             }
 #endif
         }
+#ifdef QCOM_USBAUDIO_ENABLED
+        if((devices == AudioSystem::DEVICE_IN_COMMUNICATION) &&
+           ((mCurDevice == AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET)||
+           (mCurDevice ==  AudioSystem::DEVICE_OUT_DGTL_DOCK_HEADSET))){
+               ALOGD("Starting recording in openInputstream, musbRecordingState: %d", musbRecordingState);
+               startUsbRecordingIfNotStarted();
+               musbRecordingState |= USBRECBIT_VOIPCALL;
+        }
+#endif
         if(sampleRate) {
             it->sampleRate = *sampleRate;
         }
@@ -2958,10 +2975,10 @@ void AudioHardwareALSA::extOutThreadFunc() {
             }
         }
         err = mALSADevice->readFromProxy(&data, &size);
-        if(err < 0) {
-           ALOGE("ALSADevice readFromProxy returned err = %d,data = %p,\
+        if (err < 0) {
+            ALOGE("ALSADevice readFromProxy returned err = %d,data = %p,\
                     size = %ld", err, data, size);
-           continue;
+            continue;
         }
 
 #ifdef OUTPUT_BUFFER_LOG

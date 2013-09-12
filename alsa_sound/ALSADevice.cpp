@@ -136,6 +136,10 @@ ALSADevice::ALSADevice() {
     mA2220Mode = A2220_PATH_INCALL_RECEIVER_NSOFF;
 #endif
 
+#ifdef SEPERATED_AUDIO_INPUT
+    mInputSource = AUDIO_SOURCE_DEFAULT;
+#endif
+
     ALOGD("ALSA module opened");
 }
 
@@ -2662,6 +2666,7 @@ ssize_t  ALSADevice::readFromProxy(void **captureBuffer , ssize_t *bufferSize) {
         }
 
         mProxyParams.mAvail = pcm_avail(capture_handle);
+        mAvailInMs = (mProxyParams.mAvail*1000)/(AFE_PROXY_SAMPLE_RATE);
         ALOGV("avail is = %d frames = %ld, avai_min = %d\n",\
                       mProxyParams.mAvail,  mProxyParams.mFrames,(int)capture_handle->sw_p->avail_min);
         if (mProxyParams.mAvail < capture_handle->sw_p->avail_min) {
